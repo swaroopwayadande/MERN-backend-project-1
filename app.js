@@ -4,7 +4,7 @@ const cookieParser = require("cookie-parser");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const userModel = require("./models/user"); 
-const postModel = require("./models/post"); // if you use posts
+const postModel = require("./models/post"); // Your posts model
 
 app.set("view engine", "ejs");
 
@@ -17,7 +17,7 @@ app.use(cookieParser());
 
 // Home page
 app.get('/', (req, res) => {
-    res.render("index"); // make sure views/index.ejs exists
+    res.render("index");
 });
 
 // REGISTER
@@ -34,8 +34,7 @@ app.post('/register', async (req, res) => {
             return res.status(400).send("User already exists");
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hash = await bcrypt.hash(password, salt);
+        const hash = await bcrypt.hash(password, 10);
 
         let newUser = await userModel.create({
             username,
@@ -56,7 +55,7 @@ app.post('/register', async (req, res) => {
 
 // LOGIN PAGE
 app.get('/login', (req, res) => {
-    res.render('login'); // make sure views/login.ejs exists
+    res.render('login');
 });
 
 // LOGIN LOGIC
@@ -69,20 +68,14 @@ app.post('/login', async (req, res) => {
             return res.status(400).send("Invalid username or password");
         }
 
-        bcrypt.compare(password, user.password, (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).send("Server error");
-            }
-            if (result) {
-                let token = jwt.sign({ email: user.email, userid: user._id }, "shhh");
-                res.cookie("token", token);
-                res.status(200).send("You can login"); 
-                // or redirect to profile: res.redirect('/profile');
-            } else {
-                res.status(401).send("Invalid username or password");
-            }
-        });
+        const match = await bcrypt.compare(password, user.password);
+        if (match) {
+            let token = jwt.sign({ email: user.email, userid: user._id }, "shhh");
+            res.cookie("token", token);
+            res.redirect('/profile');
+        } else {
+            res.status(401).send("Invalid username or password");
+        }
     } catch (error) {
         console.error("Login route error:", error);
         res.status(500).send("Server error during login");
@@ -95,26 +88,39 @@ app.get('/logout', (req, res) => {
     res.redirect("/login");
 });
 
-// PROFILE PAGE (Protected)
-// Change from this:
-app.post('/profile', isLoggedIn, (req, res) => {
-    console.log(req.user);
-    res.render("login");
+// PROFILE PAGE (SHOW PROFILE + POSTS)
+app.get('/profile', isLoggedIn, async (req, res) => {
+    try {
+        const user = await userModel.findById(req.user.userid).populate("posts");
+        res.render("profile", { user, posts: user.posts });
+    } catch (error) {
+        console.error("Profile route error:", error);
+        res.status(500).send("Error loading profile");
+    }
 });
 
-// To this:
-app.get('/profile', isLoggedIn, (req, res) => {
-    console.log(req.user);
-    // For example, render a profile page or send user info
-    res.render("profile", { user: req.user }); // assuming you have a profile.ejs template
-});
+// CREATE POST
+app.post('/posts', isLoggedIn, async (req, res) => {
+   let user = await userModel.findOne({email: req.user.email});
+   let {content} = req.body;
 
+   let post = await postModel.create({
+    user: user._id,
+    content
+   });
+
+   user.posts.push(post._id);
+   await user.save();
+
+   res.redirect("/profile");
+
+});
 
 // Middleware to check login
 function isLoggedIn(req, res, next) {
     const token = req.cookies.token;
     if (!token) {
-        return res.status(401).send("You must be logged in");
+        return res.redirect("/login");
     }
     try {
         let data = jwt.verify(token, "shhh");
