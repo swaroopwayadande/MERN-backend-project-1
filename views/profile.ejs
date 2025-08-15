@@ -13,12 +13,24 @@
     
     <!-- Profile Info -->
     <div class="bg-gray-800 rounded-lg p-6 shadow">
-      <h1 class="text-2xl font-bold mb-2">
-        Welcome, <%= user?.username || user?.email || 'User' %>
-      </h1>
-      <p class="text-gray-400 mb-4">
-        User ID: <%= user?._id || user?.userid || '' %>
-      </p>
+      <!-- Profile picture (normal HTML image) -->
+      <div class="flex items-center gap-4 mb-4">
+       <img
+  src="/images/uploads/<%= user.profilepic%>"
+  alt="Avatar"
+  class="w-20 h-20 rounded-ful"
+
+        />
+        <div>
+          <h1 class="text-2xl font-bold mb-1">
+            Welcome, <%= user?.username || user?.email || 'User' %>
+          </h1>
+          <p class="text-gray-400">
+            User ID: <%= user?._id || user?.userid || '' %>
+          </p>
+        </div>
+      </div>
+
       <a href="/logout"
          class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-md font-semibold">
         Logout
@@ -61,10 +73,16 @@
             
             <!-- Post Header -->
             <div class="flex items-center gap-3 mb-2">
+              <!-- Use static profile image here too, or keep avatar service -->
+              <!-- Static profile image option: -->
+              <!-- <img src="/images/profile.jpg" alt="Avatar" class="w-8 h-8 rounded-full object-cover"> -->
+
+              <!-- Existing dynamic avatar (kept by default): -->
               <img
-                src="https://ui-avatars.com/api/?name=<%= encodeURIComponent(user.username || user.email || 'User') %>&background=0D8ABC&color=fff"
+                src="<%= user.profilepic %>"
                 alt="Avatar"
-                class="w-8 h-8 rounded-full">
+                class="w-8 h-8 rounded-full"
+              >
               <span class="font-semibold"><%= user.username || user.email || 'User' %></span>
             </div>
             

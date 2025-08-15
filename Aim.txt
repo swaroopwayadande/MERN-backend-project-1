@@ -1,0 +1,7 @@
+user post likh paye
+user create krne hai
+login and register 
+lgout
+post creation 
+post like 
+post delete
