@@ -131,6 +131,65 @@ function isLoggedIn(req, res, next) {
     }
 }
 
+
+
+
+
+// Like or Unlike a post
+app.get('/like/:id', isLoggedIn, async (req, res) => {
+    let post = await postModel.findOne({ _id: req.params.id }).populate("user");
+
+    // If user hasn't liked it yet, add their ID
+    if (post.likes.indexOf(req.user.userid) === -1) {
+        post.likes.push(req.user.userid);
+    } 
+    // If already liked, remove (unlike)
+    else {
+        post.likes.splice(post.likes.indexOf(req.user.userid), 1);
+    }
+
+    await post.save();
+    res.redirect("/profile"); // Go back to profile after like/unlike
+});
+
+
+// Show Edit Page
+app.get("/posts/:id/edit", isLoggedIn, async (req, res) => {
+ let post = await postModel.findOne({ _id: req.params.id }).populate("user");
+  res.render("edit",{post});
+});
+
+
+//updating post 
+app.post("/update/:id", isLoggedIn, async (req, res) => {
+  try {
+    await postModel.findByIdAndUpdate(
+      req.params.id,
+      { content: req.body.content },
+      { runValidators: true }
+    );
+    res.redirect("/profile");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Update failed");
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 app.listen(3000, () => {
     console.log("Server running on http://localhost:3000");
 });

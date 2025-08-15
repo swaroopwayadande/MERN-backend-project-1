@@ -1,19 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>User Profile</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen p-6">
 
-  <div class="space-y-6 max-w-md">
+  <!-- Main Container: Left-Aligned -->
+  <div class="space-y-6 max-w-md ml-6">
     
     <!-- Profile Info -->
     <div class="bg-gray-800 rounded-lg p-6 shadow">
-      <h1 class="text-2xl font-bold mb-2">Welcome, <%= user?.username || user?.email || 'User' %></h1>
-      <p class="text-gray-400 mb-4">User ID: <%= user?._id || user?.userid || '' %></p>
+      <h1 class="text-2xl font-bold mb-2">
+        Welcome, <%= user?.username || user?.email || 'User' %>
+      </h1>
+      <p class="text-gray-400 mb-4">
+        User ID: <%= user?._id || user?.userid || '' %>
+      </p>
       <a href="/logout"
          class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-md font-semibold">
         Logout
@@ -28,6 +33,7 @@
           placeholder="What's on your mind?"
           class="w-full bg-gray-700 rounded-md p-3 text-gray-200 placeholder-gray-400 outline-none resize-none mb-4"
           rows="3"
+          required
         ></textarea>
         <button type="submit"
                 class="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md font-semibold">
@@ -35,31 +41,65 @@
         </button>
       </form>
     </div>
-<!-- Posts Block -->
-<div class="space-y-4">
-  <h2 class="text-xl font-semibold">Your Posts</h2>
 
-  <% if (posts && posts.length > 0) { %>
-    <% user.posts.reverse().forEach(function(p) { %>
-    <!-- <%  %> -->
-      <div class="bg-gray-800 rounded-lg p-4 shadow">
-        <div class="flex items-center gap-3 mb-2">
-          <img
-            src="https://ui-avatars.com/api/?name=<%= encodeURIComponent(user.username || user.email || 'User') %>&background=0D8ABC&color=fff"
-            alt="Avatar"
-            class="w-8 h-8 rounded-full">
-          <span class="font-semibold"><%= user.username || user.email || 'User' %></span>
-        </div>
-        <p class="text-gray-200"><%= p.content %></p>
-        <p class="text-gray-500 text-xs mt-2">
-          <%= (p.createdAt ? new Date(p.createdAt) : (p.date ? new Date(p.date) : new Date())).toLocaleString() %>
-        </p>
-      </div>
-    <% }) %>
-  <% } else { %>
-    <p class="text-gray-400">No posts yet.</p>
-  <% } %>
-</div>
+    <!-- Posts Block -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-semibold">Your Posts</h2>
+
+      <% if (user.posts && user.posts.length > 0) { %>
+        <% 
+          // If your likes array contains ObjectId, and user.userid is string:
+          // const uid = String(user.userid);
+          // Then for checks use: (p.likes || []).map(String).includes(uid)
+        %>
+        <% user.posts.slice().reverse().forEach(function(p) { 
+             const likedByUser = p.likes && p.likes.includes(user.userid); 
+             // If needed for ObjectId mismatch, replace the above with:
+             // const likedByUser = (p.likes || []).map(String).includes(String(user.userid));
+        %>
+          <div class="bg-gray-800 rounded-lg p-4 shadow">
+            
+            <!-- Post Header -->
+            <div class="flex items-center gap-3 mb-2">
+              <img
+                src="https://ui-avatars.com/api/?name=<%= encodeURIComponent(user.username || user.email || 'User') %>&background=0D8ABC&color=fff"
+                alt="Avatar"
+                class="w-8 h-8 rounded-full">
+              <span class="font-semibold"><%= user.username || user.email || 'User' %></span>
+            </div>
+            
+            <!-- Post Content -->
+            <p class="text-gray-200"><%= p.content %></p>
+            <p class="text-gray-500 text-xs mt-2">
+              <%= (p.createdAt ? new Date(p.createdAt) : (p.date ? new Date(p.date) : new Date())).toLocaleString() %>
+            </p>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2 mt-3">
+              
+              <!-- Like / Unlike Button -->
+              <a href="/like/<%= p._id %>"
+                 class="<%= likedByUser ? 'bg-green-700 hover:bg-green-800' : 'bg-green-600 hover:bg-green-700' %> px-3 py-1 rounded-md text-sm font-semibold">
+                👍 <%= likedByUser ? 'Unlike' : 'Like' %>
+              </a>
+
+              <!-- Likes Count -->
+              <small class="text-blue-500">
+                <%= p.likes ? p.likes.length : 0 %> Likes
+              </small>
+
+              <!-- Edit Button on Right -->
+              <a href="/posts/<%= p._id %>/edit"  
+                 class="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded-md text-sm font-semibold ml-auto">
+                ✏️ Edit
+              </a>
+            </div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <p class="text-gray-400">No posts yet.</p>
+      <% } %>
+    </div>
 
   </div>
 
