@@ -72,24 +72,7 @@ app.get("/", (req, res) => {
   res.render("index");
 });
 
-// 10.1) Global feed with all posts, populate author info
-app.get("/globalfeed",isLoggedIn, async (req, res) => {
-  try {
-    const allPosts = await postModel.find({})
-      .populate("user")
-      .sort({ createdAt: -1 });
 
-    const user = req.user
-      ? { userid: String(req.user.userid), _id: String(req.user.userid), email: req.user.email }
-      : null;
-
-    res.render('globalfeed', { allPosts, user });
-
-  } catch (err) {
-    console.error("Global feed error:", err);
-    res.render("globalfeed", { allPosts: [], user: req.user || null });
-  }
-});
 
 // 11) Register new user
 app.post("/register", async (req, res) => {
@@ -113,12 +96,15 @@ app.post("/register", async (req, res) => {
 
     let token = jwt.sign({ email: newUser.email, userid: newUser._id }, "shhh");
     res.cookie("token", token);
-    res.status(201).send("Registered Successfully");
+    res.status(201).redirect("login");
   } catch (error) {
     console.error("Register error:", error);
     res.status(500).send("Server error during registration");
   }
-});
+}
+
+);
+// res.redirect("login");
 
 // 12) Show login page
 app.get("/login", (req, res) => {
@@ -158,15 +144,18 @@ app.get("/logout", (req, res) => {
 app.get("/profile", isLoggedIn, async (req, res) => {
   try {
     const user = await userModel.findById(req.user.userid).populate("posts");
-    res.render("profile", { user, posts: user.posts });
+
+    const allPosts = await postModel.find({})
+      .populate("user")
+      .sort({ createdAt: -1 });
+
+    res.render("profile", { user, posts: user.posts, allPosts });
   } catch (error) {
-    console.error("Profile error:", error);
+    console.error("Error loading profile:", error);
     res.status(500).send("Error loading profile");
   }
-
-  
-
 });
+
 
 // 16) Show profile picture upload form
 app.get("/profile/upload", isLoggedIn, (req, res) => {
