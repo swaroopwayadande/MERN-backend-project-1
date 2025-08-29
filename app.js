@@ -1,135 +1,107 @@
-// EXPRESS APP (simple social demo with login, posts, likes, edit, and file upload)
-
+// app.js - simple social app backend with login, posts, likes, and uploads
 
 // 1) Import libraries and initialize the app
-const express = require("express");              // -> Web framework to build routes and handle requests
-const app = express();                           // -> Create an Express application instance
+const express = require("express");               // Web framework
+const app = express();                             // Express app instance
 
+const cookieParser = require("cookie-parser");    // Read cookies
+const bcrypt = require("bcrypt");                  // Password hashing
+const jwt = require("jsonwebtoken");               // JWT token creation and verification
+const path = require("path");                       // File paths
 
-const cookieParser = require("cookie-parser");   // -> Helps read cookies sent by the browser
-const bcrypt = require("bcrypt");                // -> For hashing passwords securely
-const jwt = require("jsonwebtoken");             // -> For creating and verifying login tokens (JWT)
-const path = require("path");                    // -> Node utility for handling file paths
+// (Optional) 2) Database connection (uncomment and set your Mongo URI)
+// const mongoose = require("mongoose");
+// mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/simple-social", {
+//   useNewUrlParser: true, useUnifiedTopology: true
+// });
 
+// 3) Import Mongoose models (User and Post schemas)
+const userModel = require("./models/user");
+const postModel = require("./models/post");
 
-// 2) (Optional) Database connection setup (uncomment and set your URI to enable)
-// const mongoose = require("mongoose");         // -> MongoDB object modeling tool
-// mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/simple-social");
-// -> Connects to a local MongoDB database named "simple-social" if no MONGO_URI is provided
+// 4) Import multer config for file uploads
+const upload = require("./config/multerconfig");
 
-
-// 3) Import your Mongoose models (User and Post)
-const userModel = require("./models/user");      // -> User schema/model (users collection)
-const postModel = require("./models/post");      // -> Post schema/model (posts collection)
-
-
-// 4) Import file upload config (multer)
-const upload = require("./config/multerconfig"); // -> Multer instance that saves uploaded files to /public/images/uploads
-
-
-// -------------------- App Setup (middleware and view engine) --------------------
-
+// -------------------- App Setup --------------------
 
 // 5) Set view engine to EJS
-app.set("view engine", "ejs");                   // -> Tells Express to use EJS templates for rendering HTML
+app.set("view engine", "ejs");
 
+// 6) Middleware to parse request bodies
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
-// 6) Parse incoming request bodies
-app.use(express.urlencoded({ extended: true })); // -> Parses form submissions (application/x-www-form-urlencoded)
-app.use(express.json());                         // -> Parses JSON bodies (application/json)
-
-
-// 7) Serve static files (CSS, images, client-side JS) from the "public" folder
+// 7) Serve static files (CSS, images, JS) from public folder
 app.use(express.static(path.join(__dirname, "public")));
-// -> Any file in /public is accessible in the browser at the root path, e.g., /images/logo.png
 
+// 8) Parse cookies
+app.use(cookieParser());
 
-// 8) Read cookies so we can access tokens
-app.use(cookieParser());                         // -> Makes cookies available as req.cookies
+// -------------------- Auth Middleware --------------------
 
-
-// -------------------- Auth Guard (protect certain routes) --------------------
-
-
-// 9) Middleware to check if a user is logged in
+// 9) Middleware to protect routes - check if logged in via JWT token in cookies
 function isLoggedIn(req, res, next) {
-  const token = req.cookies.token;               // -> Read token from cookies
-  if (!token) return res.redirect("/login");     // -> If no token, send to login page
-
+  const token = req.cookies.token;
+  if (!token) return res.redirect("/login");
 
   try {
-    let data = jwt.verify(token, "shhh");        // -> Verify token using our secret ("shhh")
-    req.user = data;                             // -> Attach decoded user data { email, userid } to request
-    next();                                      // -> Continue to the protected route
+    const data = jwt.verify(token, "shhh");
+    req.user = data;
+    next();
   } catch (error) {
-    return res.status(401).send("Invalid token");// -> If token is bad/expired, reject
+    return res.status(401).send("Invalid token");
   }
 }
 
-
-// 9.1) Minimal helper to expose user in templates on public routes (non-breaking)
+// 9.1) Middleware to expose user info to templates on public routes if token valid
 app.use((req, res, next) => {
   try {
     const token = req.cookies && req.cookies.token;
     if (token && !req.user) {
-      const data = jwt.verify(token, "shhh"); // same secret for consistency
+      const data = jwt.verify(token, "shhh");
       req.user = data;
     }
-  } catch (_) { /* ignore invalid/expired token on public pages */ }
+  } catch (_) { /* ignore invalid/expired token */ }
   next();
 });
 
-
-// -------------------- Public Routes (no login required) --------------------
-
+// -------------------- Public Routes --------------------
 
 // 10) Home page
 app.get("/", (req, res) => {
-  res.render("index");                           // -> Render views/index.ejs
+  res.render("index");
 });
 
-
-// 10.1) Global feed route (added) — renders index.ejs using your EJS global feed block
-app.get("/globalfeed", async (req, res) => {
+// 10.1) Global feed with all posts, populate author info
+app.get("/globalfeed",isLoggedIn, async (req, res) => {
   try {
-    // IMPORTANT: Your EJS uses p.author.*, so Post schema should have `author` ref to User.
-    // If your Post schema currently uses `user`, either switch EJS to p.user.* and populate('user'),
-    // or keep both fields in schema. Here we populate('author') to match the provided EJS.
-    const allPosts = await postModel
-      .find({})
-      .populate("author")          // author: { type: ObjectId, ref: 'User' }
-      .sort({ createdAt: -1 });    // if timestamps are enabled
+    const allPosts = await postModel.find({})
+      .populate("user")
+      .sort({ createdAt: -1 });
 
-    // Provide a minimal user object for likedByUser checks in EJS (needs userid or _id)
     const user = req.user
       ? { userid: String(req.user.userid), _id: String(req.user.userid), email: req.user.email }
       : null;
 
-    res.render("index", { allPosts, user });
+    res.render('globalfeed', { allPosts, user });
+
   } catch (err) {
-    console.error("globalfeed error:", err);
-    res.render("index", { allPosts: [], user: req.user || null });
+    console.error("Global feed error:", err);
+    res.render("globalfeed", { allPosts: [], user: req.user || null });
   }
 });
 
-
-// 11) Register a new user
+// 11) Register new user
 app.post("/register", async (req, res) => {
   try {
-    let { email, password, username, name, age } = req.body; // -> Read fields from the form
-
+    let { email, password, username, name, age } = req.body;
 
     if (!password) return res.status(400).send("Password is required");
-    // -> Basic validation for password
-
 
     let existingUser = await userModel.findOne({ email });
     if (existingUser) return res.status(400).send("User already exists");
-    // -> Prevent duplicate registration with same email
 
-
-    const hash = await bcrypt.hash(password, 10); // -> Securely hash the password with salt rounds = 10
-
+    const hash = await bcrypt.hash(password, 10);
 
     let newUser = await userModel.create({
       username,
@@ -137,183 +109,136 @@ app.post("/register", async (req, res) => {
       age,
       name,
       password: hash,
-      // profilepic can default in the schema, e.g., "default.jpg"
     });
-    // -> Create a new user document in MongoDB
-
 
     let token = jwt.sign({ email: newUser.email, userid: newUser._id }, "shhh");
     res.cookie("token", token);
-    // -> After registration, log them in by setting a token cookie
-
-
-    res.status(201).send("Registered Successfully"); // -> Respond success (could redirect to /profile if you prefer)
+    res.status(201).send("Registered Successfully");
   } catch (error) {
-    console.error("Register route error:", error);
+    console.error("Register error:", error);
     res.status(500).send("Server error during registration");
   }
 });
 
-
-// 12) Show login page (GET)
+// 12) Show login page
 app.get("/login", (req, res) => {
-  res.render("login");                           // -> Render views/login.ejs
+  res.render("login");
 });
 
-
-// 13) Handle login (POST)
+// 13) Handle login post
 app.post("/login", async (req, res) => {
   try {
-    let { username, password } = req.body;       // -> Read login credentials
-
+    let { username, password } = req.body;
 
     let user = await userModel.findOne({ username });
     if (!user) return res.status(400).send("Invalid username or password");
-    // -> Check if user exists
-
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).send("Invalid username or password");
-    // -> Verify password against stored hash
-
 
     let token = jwt.sign({ email: user.email, userid: user._id }, "shhh");
     res.cookie("token", token);
-    // -> Set token cookie to keep user logged in
 
-
-    res.redirect("/profile");                    // -> Send to profile page after successful login
+    res.redirect("/profile");
   } catch (error) {
-    console.error("Login route error:", error);
+    console.error("Login error:", error);
     res.status(500).send("Server error during login");
   }
 });
 
-
-// 14) Logout (clears the token cookie)
+// 14) Logout - clears token cookie
 app.get("/logout", (req, res) => {
-  res.clearCookie("token");                      // -> Remove the cookie
-  res.redirect("/login");                        // -> Go back to login page
+  res.clearCookie("token");
+  res.redirect("/login");
 });
 
+// -------------------- Protected Routes --------------------
 
-// -------------------- Protected Routes (login required) --------------------
-
-
-// 15) Profile page (shows the logged-in user and their posts)
+// 15) Profile page showing logged-in user and their posts
 app.get("/profile", isLoggedIn, async (req, res) => {
   try {
-    const user = await userModel
-      .findById(req.user.userid)                 // -> Find current user by ID from token
-      .populate("posts");                        // -> Replace post IDs with full post documents
-
-
+    const user = await userModel.findById(req.user.userid).populate("posts");
     res.render("profile", { user, posts: user.posts });
-    // -> Pass user and posts to the EJS template for display
   } catch (error) {
-    console.error("Profile route error:", error);
+    console.error("Profile error:", error);
     res.status(500).send("Error loading profile");
   }
+
+  
+
 });
 
-
-// 16) Show simple upload page (form to upload profile picture)
+// 16) Show profile picture upload form
 app.get("/profile/upload", isLoggedIn, (req, res) => {
-  res.render("profileupload");                   // -> Render views/profileupload.ejs
+  res.render("profileupload");
 });
 
-
-// 17) Handle file upload and save filename into user's profile
+// 17) Handle profile pic upload & update user doc
 app.post("/upload", isLoggedIn, upload.single("image"), async (req, res) => {
   try {
     const user = await userModel.findOne({ email: req.user.email });
     if (!user) return res.status(404).send("User not found");
-    // -> Make sure the logged-in user exists in DB
-
 
     if (!req.file || !req.file.filename) {
       return res.status(400).send("No file uploaded");
     }
-    // -> Ensure multer actually received a file
 
+    user.profilepic = req.file.filename;
+    await user.save();
 
-    user.profilepic = req.file.filename;         // -> Save only the filename (e.g., "1692-abc.jpg")
-                                                 // -> Image is stored by multer in /public/images/uploads
-
-
-    await user.save();                            // -> Persist changes to DB
-
-
-    res.redirect("/profile");                     // -> Back to profile to see the new picture
+    res.redirect("/profile");
   } catch (err) {
-    console.error("Upload route error:", err);
+    console.error("Upload error:", err);
     res.status(500).send("Upload failed");
   }
 });
 
-
 // 18) Create a new post
 app.post("/posts", isLoggedIn, async (req, res) => {
-  let user = await userModel.findOne({ email: req.user.email }); // -> Current user
-  let { content } = req.body;                                    // -> Post body text
-
+  let user = await userModel.findOne({ email: req.user.email });
+  let { content } = req.body;
 
   let post = await postModel.create({
-    user: user._id,                                              // -> Link post to user
-    content,                                                     // -> Store content
+    user: user._id,
+    content,
   });
 
+  user.posts.push(post._id);
+  await user.save();
 
-  user.posts.push(post._id);                                     // -> Add post to user's posts array
-  await user.save();                                             // -> Save user changes
-
-
-  res.redirect("/profile");                                      // -> Refresh profile to show the new post
+  res.redirect("/profile");
 });
 
-
-// 19) Like / Unlike a post (toggle)
+// 19) Like / Unlike post (toggle)
 app.get("/like/:id", isLoggedIn, async (req, res) => {
-  let post = await postModel
-    .findOne({ _id: req.params.id })                             // -> Find post by ID from URL
-    .populate("user");                                           // -> Optionally get post owner
+  let post = await postModel.findOne({ _id: req.params.id }).populate("user");
 
-
-  // -> Toggle logic: if user ID not in likes, add it; otherwise remove it
   if (post.likes.indexOf(req.user.userid) === -1) {
-    post.likes.push(req.user.userid);                            // -> Like
+    post.likes.push(req.user.userid);
   } else {
-    post.likes.splice(post.likes.indexOf(req.user.userid), 1);   // -> Unlike
+    post.likes.splice(post.likes.indexOf(req.user.userid), 1);
   }
 
-
-  await post.save();                                             // -> Save updated likes array
-  res.redirect("/profile");                                      // -> Back to profile
+  await post.save();
+  res.redirect("/profile");
 });
 
-
-// 20) Show edit page for a post
+// 20) Show edit page for post
 app.get("/posts/:id/edit", isLoggedIn, async (req, res) => {
-  let post = await postModel
-    .findOne({ _id: req.params.id })                             // -> Find the post to edit
-    .populate("user");                                           // -> Load the user who made it
-
-
-  res.render("edit", { post });                                  // -> Render views/edit.ejs with post data
+  let post = await postModel.findOne({ _id: req.params.id }).populate("user");
+  res.render("edit", { post });
 });
-
 
 // 21) Update post content
 app.post("/update/:id", isLoggedIn, async (req, res) => {
   try {
     await postModel.findByIdAndUpdate(
-      req.params.id,                                             // -> Which post to update
-      { content: req.body.content },                             // -> New content from form
-      { runValidators: true }                                    // -> Make sure schema rules apply
+      req.params.id,
+      { content: req.body.content },
+      { runValidators: true }
     );
 
-
-    res.redirect("/profile");                                    // -> After saving, go back to profile
+    res.redirect("/profile");
   } catch (err) {
     console.error(err);
     res.status(500).send("Update failed");
@@ -321,11 +246,9 @@ app.post("/update/:id", isLoggedIn, async (req, res) => {
 });
 
 
+
 // -------------------- Start the server --------------------
-
-
-// 22) Start listening for requests on port 3000
-app.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });
-// -> Open your browser and visit http://localhost:3000

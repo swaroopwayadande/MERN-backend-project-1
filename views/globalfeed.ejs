@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+</head>
+<body>
+    <main class="lg:col-span-2">
+  <h2 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-2">Global Feed</h2>
+
+  <% if (allPosts && allPosts.length > 0) { %>
+    <div class="space-y-6">
+      <% allPosts.forEach(function(p) {
+           const uid = String((user && (user.userid || user._id)) || '');
+           const likedByUser = (p.likes || []).map(String).includes(uid);
+           const authorName = (p.author && (p.author.username || p.author.email)) ? (p.author.username || p.author.email) : 'User';
+           const authorPic = (p.author && p.author.profilepic) ? `/images/uploads/${p.author.profilepic}` : '/images/uploads/default.jpg';
+           const authorId = (p.author && p.author._id) ? p.author._id : '';
+      %>
+        <article class="bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <header class="flex items-center gap-4 mb-4">
+            <img
+              src="<%= authorPic %>"
+              alt="Author Avatar"
+              class="w-12 h-12 rounded-full object-cover border-2 border-gray-600"
+            />
+            <div class="flex flex-col min-w-0">
+              <a href="/users/<%= authorId %>"
+                 class="font-semibold text-lg hover:underline truncate">
+                <%= authorName %>
+              </a>
+              <time class="text-gray-400 text-sm truncate"
+                    datetime="<%= p.createdAt ? p.createdAt.toISOString() : new Date().toISOString() %>">
+                • <%= p.createdAt ? new Date(p.createdAt).toLocaleString() : new Date().toLocaleString() %>
+              </time>
+            </div>
+          </header>
+
+          <p class="text-gray-200 whitespace-pre-wrap break-words mb-5 text-base leading-relaxed"><%= p.content %></p>
+
+          <div class="flex items-center gap-4">
+            <a href="/like/<%= p._id %>"
+               class="<%= likedByUser ? 'bg-green-700 hover:bg-green-800' : 'bg-green-600 hover:bg-green-700' %> px-4 py-2 rounded-md text-sm font-semibold flex items-center gap-2 select-none transition-colors duration-200">
+               👍 <span><%= likedByUser ? 'Unlike' : 'Like' %></span>
+            </a>
+            <span class="text-blue-400 text-sm font-medium">
+              <%= (p.likes && p.likes.length) ? p.likes.length : 0 %> Likes
+            </span>
+
+            <a href="/posts/<%= p._id %>"
+               class="ml-auto text-sm text-zinc-400 hover:text-white underline underline-offset-4">
+               View details
+            </a>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <p class="text-gray-400 text-center mt-10 text-lg">No posts in the global feed yet.</p>
+  <% } %>
+</main>
+
+</body>
+</html>
