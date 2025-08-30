@@ -1,6 +1,6 @@
 ﻿# MERN Backend Authentication Project
 
-This is a Node.js backend project built with **Express**, **MongoDB**, **JWT**, and **bcrypt** for secure authentication.  
+This is a posting app built in Node.js backend project built with **Express**, **MongoDB**, **JWT**, and **bcrypt** for secure authentication.  
 It includes user registration, login, logout, and a protected profile route using cookies and middleware.
 
 ---
