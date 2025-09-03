@@ -5,3 +5,5 @@ lgout
 post creation 
 post like 
 post delete
+global feed 
+profile pfp
