@@ -1,11 +1,8 @@
-
 const mongoose = require('mongoose');
 
-mongoose.connect('mongodb://127.0.0.1:27017/miniproject')
+mongoose.connect('mongodb+srv://swaroopwayadande_db_user:Swaroop_9850@blog-app-1.8p6mtda.mongodb.net/miniproject?retryWrites=true&w=majority&appName=blog-app-1')
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
-
-
 
 const userSchema = mongoose.Schema({
     username: String,
@@ -13,12 +10,10 @@ const userSchema = mongoose.Schema({
     age: Number,
     email: String,
     password: String,
-
-profilepic:{
-type: String,
-default: "default.png"
-},
-
+    profilepic: {
+        type: String,
+        default: "default.png"
+    },
     posts: [
         { type: mongoose.Schema.Types.ObjectId, ref: "post" }
     ]
